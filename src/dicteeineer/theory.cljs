@@ -139,24 +139,17 @@
 ;; ---------------------------------------------------------------- bars
 
 (defn accidentals
-  "The accidental to print for each note, or nil: what differs from the signature and from earlier
-   notes on the same step in the bar."
-  [key beats notes]
-  (loop [i 0 state {} out []]
-    (if (= i (count notes))
+  "The accidental to print for each note of a bar, or nil: what differs from the signature and
+   from earlier notes on the same step in the bar."
+  [key notes]
+  (loop [[n & more :as ns] (seq notes) state {} out []]
+    (if (empty? ns)
       out
-      (let [state (if (zero? (mod i beats)) {} state)
-            n (nth notes i)]
-        (if-not n
-          (recur (inc i) state (conj out nil))
-          (let [cur (get state (:s n) (sig-alt key (letter n)))]
-            (recur (inc i) (assoc state (:s n) (:a n)) (conj out (when (not= cur (:a n)) (:a n))))))))))
+      (let [cur (get state (:s n) (sig-alt key (letter n)))]
+        (recur more (assoc state (:s n) (:a n)) (conj out (when (not= cur (:a n)) (:a n))))))))
 
 (defn implied-alt
-  "What an unmarked note on step `s` at `slot` means: the signature, or an earlier accidental in the bar."
-  [key beats notes slot s]
-  (let [v (vec notes)
-        end (min slot (count v))
-        start (min end (* beats (quot slot beats)))]
-    (or (some (fn [n] (when (= s (:s n)) (:a n))) (reverse (subvec v start end)))
-        (sig-alt key (mod s 7)))))
+  "What an unmarked note on step `s` at index `i` of a bar means: the signature, or an earlier accidental."
+  [key notes i s]
+  (or (some (fn [n] (when (= s (:s n)) (:a n))) (reverse (take i notes)))
+      (sig-alt key (mod s 7))))

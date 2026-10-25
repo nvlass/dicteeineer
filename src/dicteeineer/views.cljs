@@ -3,6 +3,7 @@
             [reagent.core :as r]
             [dicteeineer.theory :as t]
             [dicteeineer.events :as events]
+            [dicteeineer.rhythm :as rh]
             [dicteeineer.score :as score]
             [dicteeineer.piano :refer [piano]]
             [dicteeineer.i18n :refer [tr]]))
@@ -38,7 +39,7 @@
   "The most bars per line that fit (allowing a slight shrink), dividing the bars evenly."
   [props bars]
   (or (first (filter #(and (zero? (mod bars %))
-                           (<= (* 0.85 (:zoom props) (score/system-width (assoc props :time-sig? true) %)) (available-width)))
+                           (<= (* 0.8 (:zoom props) (score/system-width (assoc props :time-sig? true) %)) (available-width)))
                      [4 3 2]))
       1))
 
@@ -95,9 +96,8 @@
          [:span.tally (:ok session) " / " (:n session)])]
       (when (= phase :answered)
         [:div.single
-         [score/system {:clef clef :keysig t/default-key :beats 1 :col-w 56 :zoom 1.6 :dur :whole :from 0 :n 1
-                        :notes [(t/spell t/default-key target)] :accs [(when-not (t/white? target) 1)]
-                        :marks {0 :ok}}]])
+         [score/single {:clef clef :zoom 1.6 :cls "ok" :note (t/spell t/default-key target)
+                        :acc (when-not (t/white? target) 1)}]])
       [:div.actions.center
        (if (= phase :idle)
          [:button.primary.big {:on-click #(>evt [:note/start])} (tr :ui/start)]
@@ -141,15 +141,37 @@
      [clef-fields]
      [field (tr :ui/repeats)
       [seg [[:strict (tr :ui/strict)] [:free (tr :ui/free)]] (:dict-repeats s) (setter :dict-repeats)]]
+     [field (tr :ui/rhythm)
+      [seg (for [l (range 1 (inc rh/max-level))] [l (str l)]) (:dict-rhythm s) (setter :dict-rhythm)]
+      [:small.level-hint (tr (keyword "rhythm" (str "l" (:dict-rhythm s))))]]
      [toggle (tr :ui/chromatic) (:dict-chromatic s) (setter :dict-chromatic) (tr :ui/chromatic-hint)]
+     [toggle (tr :ui/count-in) (:dict-count-in s) (setter :dict-count-in)]
      [toggle (tr :ui/first-given) (:dict-first s) (setter :dict-first)]
      [:div.actions.center
       [:button.primary.big {:on-click #(>evt [:dict/new]) :title "Enter"} (tr :ui/start-dictation)]]]))
 
+(defn duration-bar []
+  (let [{:keys [dur rhythm]} (<sub [:dict])
+        vs (rh/level-values rhythm)]
+    (when (> (count vs) 1)
+      [:div.durations
+       (for [[k v] (map vector (range) [:16th :eighth :quarter :half :whole])
+             :when (some #{v} vs)]
+         ^{:key v}
+         [:button.dur {:class (when (= v (:v dur)) "on") :title (tr (keyword "dur" (name v)))
+                       :on-click #(>evt [:dict/duration v])}
+          [score/duration-icon {:v v}] [:small (inc k)]])
+       [:button.dur {:class (when (:dot dur) "on") :disabled (not (rh/can-dot? (:v dur))) :title (tr :dur/dot)
+                     :on-click #(>evt [:dict/dot])}
+        [:span.glyph "•"] [:small "."]]
+       (when (>= rhythm 6)
+         [:button.dur {:class (when (:trip dur) "on") :title (tr :dur/triplet) :on-click #(>evt [:dict/triplet])}
+          [:span.glyph "3"] [:small "T"]])])))
+
 (defn edit-tools []
   (let [d (<sub [:dict])
-        note (get-in d [:answer (events/edit-target d :sharp)])
-        can? (events/editable? d (:sel d))]
+        note (some->> (events/edit-target d) (get (events/cur-bar d)))
+        can? (some? note)]
     [:div.tools
      [:button {:title (tr :ui/tool-up) :disabled (not note) :on-click #(>evt [:dict/edit :up])} "↑"]
      [:button {:title (tr :ui/tool-down) :disabled (not note) :on-click #(>evt [:dict/edit :down])} "↓"]
@@ -159,48 +181,55 @@
      [:button {:title (tr :ui/tool-respell) :disabled (not note) :on-click #(>evt [:dict/edit :respell])} "⇄"]
      [:button {:title (tr :ui/tool-delete) :disabled (not can?) :on-click #(>evt [:dict/edit :delete])} "⌫"]]))
 
+(def beat-width {1 30 2 30 3 40 4 40 5 54 6 54})
+
 (defn dict-score []
   (let [d (<sub [:dict])
-        {:keys [clef key beats melody answer checked given sel phase] span :range} d
+        {:keys [clef key beats melody answer checked graded given? sel phase bar rhythm dur] span :range} d
         done? (= phase :done)
-        n (count melody)
-        graded (set (for [b checked i (range (* b beats) (* (inc b) beats))] i))
-        marks (into {} (for [i graded :when (not (given i))] [i (events/grade d i)]))
-        ghosts (into {} (for [[i g] marks :when (not= g :ok)] [i (melody i)]))
-        props {:clef clef :keysig key :beats beats :col-w (if (> (<sub [:width]) 600) 32 28) :time-sig? true :zoom (zoom)}]
+        writing? (and (= phase :write) (not (contains? checked bar)))
+        marks (into {} (for [[b res] graded] [b (:marks res)]))
+        ghosts (into {} (for [[b res] graded
+                              :when (or (< (:ok res) (:n res)) (some #(not= :ok %) (:marks res)))]
+                          [b (melody b)]))
+        narrow? (<= (<sub [:width]) 600)
+        props {:clef clef :keysig key :beats beats :time-sig? true :zoom (zoom)
+               :bar-w (+ 18 (* beats (cond-> (beat-width rhythm) narrow? (* 0.85))))}]
     [:div.score-wrap
      [score/score (merge props
-                         {:per-line (per-line props (:bars d)) :n n :span span
-                          :notes answer
-                          :accs (t/accidentals key beats answer)
-                          :marks (merge marks (zipmap given (repeat :given)))
-                          :ghosts ghosts
-                          :sel (when-not done? sel)
-                          :active (when-not done? (events/bar-slots d))
+                         {:per-line (per-line props (:bars d)) :n-bars (count melody) :span span
+                          :answer answer :ghosts ghosts :marks marks :checked checked
+                          :given (if given? #{[0 0]} #{})
+                          :sel (when writing? [bar sel])
+                          :active (when-not done? bar)
+                          :pickable (when writing? bar)
+                          :dur dur
                           :playing (<sub [:playing])
-                          :pickable? #(events/editable? d %)
-                          :on-pick (when-not done? #(>evt [:dict/pick %1 %2]))})]]))
+                          :on-pick (when writing? #(>evt [:dict/pick %1 %2]))})]]))
 
 (defn dict-status []
   (let [d (<sub [:dict])
-        {:keys [bar bars phase checked repeats plays]} d
-        checked? (contains? checked bar)
-        playing? (some? (<sub [:playing]))]
+        {:keys [bar bars phase checked repeats plays graded flash]} d
+        checked? (contains? checked bar)]
     (case phase
       :intro [:div.banner (tr :ui/listen-scale)]
-      :done (let [{:keys [n ok enh]} (events/results d)]
-              [:div.banner {:class (if (>= (/ (+ ok enh) (max 1 n)) 0.8) "good" "bad")}
-               (tr :fmt/result ok enh n)])
+      :done (let [{:keys [n ok enh pitch rhythm]} (events/results d)
+                  n (max 1 n)]
+              [:div.banner {:class (if (>= (/ (+ ok enh) n) 0.8) "good" "bad")}
+               (tr :fmt/result ok enh n)
+               (when (> (:rhythm d) 1)
+                 [:div.sub (tr :fmt/pitch-rhythm (pct (/ pitch n)) (pct (/ rhythm n)))])])
       [:div.dict-bar
        [:span.progress (tr :fmt/bar-of (inc bar) bars)
         (when (pos? bar) [:small (tr :fmt/hearing (inc bar))])]
        (when checked?
-         (let [[a b] (events/bar-slots d)
-               bad (count (remove #{:ok} (map #(events/grade d %) (remove (:given d) (range a b)))))]
+         (let [{:keys [marks n ok enh]} (graded bar)
+               bad (max (- n ok enh) (count (remove #{:ok :enh} marks)))]
            [:span {:class (if (zero? bad) "ok-text" "err-text")}
             (if (zero? bad) (tr :ui/bar-correct) (tr :fmt/bar-wrong bad))]))
        (when (and (= repeats :strict) (not checked?))
-         [:span.plays (tr :fmt/plays-left (max 0 (- events/strict-plays plays)))])])))
+         [:span.plays (tr :fmt/plays-left (max 0 (- events/strict-plays plays)))])
+       (when (= flash :no-room) [:span.err-text (tr :ui/no-room)])])))
 
 (defn dict-actions []
   (let [d (<sub [:dict])
@@ -226,19 +255,17 @@
      (when playing? [:button.ghost {:on-click #(>evt [:stop])} "■"])]))
 
 (defn dictation-view []
-  (let [d (<sub [:dict])
-        s (<sub [:settings])]
+  (let [d (<sub [:dict])]
     (if-not d
       [dict-setup]
-      (let [[lo hi] (:range d)
-            writing? (= :write (:phase d))]
+      (let [[lo hi] (:range d)]
         [:div
          [:div.card.trainer
           [:div.dict-head
            [:span.hint (tr :fmt/dict-summary d)]
            [:button.link {:on-click #(>evt [:dict/quit])} (tr (if (= :done (:phase d)) :ui/settings-back :ui/quit))]]
           [dict-status]
-          (when writing? [edit-tools])
+          (when (events/writable? d) [:div.input-bar [duration-bar] [edit-tools]])
           [dict-score]
           [dict-actions]]
          [piano {:lo (t/midi {:s lo :a 0}) :hi (t/midi {:s hi :a 0}) :label c-label

@@ -3,7 +3,8 @@
 ## Dictation
 
 - [ ] Infinite dictation: generate bars as you go (the walk can continue from the last degree; cadence only on stop), scroll the staff, keep a running score. The ∞ option is in the bars selector, disabled.
-- [ ] Rhythm: halves, dotted quarters, eighths; then rhythmic dictation on its own.
+- [x] Rhythm levels 1–6: halves, eighths, dotted rhythms, sixteenths, triplets.
+- [ ] Rests and ties (syncopation across beats); then rhythmic dictation on its own (one pitch).
 - [ ] Other meters (2/4, 6/8).
 - [ ] Optional tempo setting and a count-in click.
 - [ ] Two-voice dictation (bass line + melody), reusing the grand staff.

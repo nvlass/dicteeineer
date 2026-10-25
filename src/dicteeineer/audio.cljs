@@ -81,12 +81,30 @@
           (catch :default _)))))
   (reset! voices []))
 
+(defn- click! [t accent?]
+  (let [c (context)
+        osc (.createOscillator c)
+        g (.createGain c)]
+    (set! (.-type osc) "triangle")
+    (set! (.. osc -frequency -value) (if accent? 1760 1320))
+    (.setValueAtTime (.-gain g) 0.0001 t)
+    (.exponentialRampToValueAtTime (.-gain g) (if accent? 0.5 0.32) (+ t 0.003))
+    (.exponentialRampToValueAtTime (.-gain g) 0.0001 (+ t 0.06))
+    (.connect osc g)
+    (.connect g @out)
+    (.start osc t)
+    (.stop osc (+ t 0.08))
+    (swap! voices conj [osc g])))
+
 (defn play-events!
-  "`voices` is how many notes sound together; defaults to the distinct pitches in `events`."
-  [events & [voices]]
+  "`voices` is how many notes sound together; defaults to the distinct pitches in `events`.
+   `clicks` are [offset accent?] metronome ticks on the same clock."
+  [events & [voices clicks]]
   (let [c (context)
         t0 (+ (.-currentTime c) 0.05)
         gain (/ 0.6 (Math/sqrt (max 1 (or voices (count (distinct (map first events)))))))]
+    (doseq [[off accent?] clicks]
+      (click! (+ t0 off) accent?))
     (doseq [[m off dur] events]
       (play-note! m (+ t0 off) dur gain))))
 

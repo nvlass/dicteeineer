@@ -1,5 +1,6 @@
 (ns dicteeineer.melody
-  (:require [dicteeineer.theory :as t]))
+  (:require [dicteeineer.theory :as t]
+            [dicteeineer.rhythm :as rh]))
 
 ;; Melodies are walks over scale degrees: mostly steps, some leaps, each large leap recovered by a
 ;; step back; start on a tonic triad note and end 2→1 or 7→1. Candidates failing `melodic-ok?`
@@ -77,18 +78,28 @@
             (recur (+ i 2) (assoc out i (nth cands (Math/floor (* (rnd) (count cands))))) (dec budget))
             (recur (inc i) out budget)))))))
 
-(defn generate
-  "A melody of `bars` × `beats` quarter notes in `key`, within step range `[lo hi]`."
-  ([opts] (generate opts rand))
-  ([{:keys [key beats bars chromatic] [lo hi :as span] :range} rnd]
-   (let [n (* beats bars)
-         t (tonic-step key span)
+(defn pitches
+  "`n` notes in `key` within step range `[lo hi]`, ending on the tonic."
+  ([opts] (pitches opts rand))
+  ([{:keys [key n bars chromatic] [lo hi :as span] :range} rnd]
+   (let [t (tonic-step key span)
          note #(t/degree-note key t %)
          line (or (some (fn [_] (when-let [ds (walk rnd n (- lo t) (- hi t) note)]
                                   (let [notes (mapv note ds)] (when (line-ok? notes) notes))))
                         (range 400))
-                  (mapv note (take n (cycle [0 1 2 1]))))]
+                  (mapv note (concat (take (- n 2) (cycle [0 1 2 1])) [1 0])))]
      (if chromatic (chromaticize rnd key line bars) line))))
+
+(defn generate
+  "Bars of note events: a rhythm per bar at `rhythm` level, with a melody laid over it."
+  ([opts] (generate opts rand))
+  ([{:keys [beats bars rhythm] :or {rhythm 1} :as opts} rnd]
+   (let [rs (rh/bars rnd beats bars rhythm)
+         ps (pitches (assoc opts :n (reduce + (map count rs))) rnd)]
+     (loop [[r & more] rs ps ps out []]
+       (if-not r
+         out
+         (recur more (drop (count r) ps) (conj out (mapv #(assoc %1 :n %2) r ps))))))))
 
 (defn scale-notes
   "The scale up an octave and back, from the tonic that keeps it most inside the range."

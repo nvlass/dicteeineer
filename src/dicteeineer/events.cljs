@@ -2,6 +2,7 @@
   (:require [re-frame.core :as rf]
             [dicteeineer.theory :as t]
             [dicteeineer.melody :as melody]
+            [dicteeineer.rhythm :as rh]
             [dicteeineer.audio :as audio]
             [dicteeineer.storage :as storage]
             [dicteeineer.midi :as midi]
@@ -22,7 +23,9 @@
    :dict-bars 4
    :dict-chromatic false
    :dict-repeats :strict
-   :dict-first true})
+   :dict-first true
+   :dict-rhythm 1
+   :dict-count-in true})
 
 (def references {:c4 60 :a4 69})
 
@@ -31,6 +34,7 @@
 (def strict-plays 2)
 (def max-attempts 20000)
 (def max-history 500)
+(def dict-version 2)
 
 (def initial-db
   {:view :note
@@ -48,7 +52,10 @@
 
 ;; ---------------------------------------------------------------- effects
 
-(rf/reg-fx :audio/play (fn [events] (audio/stop-all!) (audio/play-events! events 1)))
+(rf/reg-fx :audio/play
+  (fn [x]
+    (audio/stop-all!)
+    (if (map? x) (audio/play-events! (:events x) 1 (:clicks x)) (audio/play-events! x 1))))
 (rf/reg-fx :audio/tap (fn [m] (audio/play-events! [[m 0 0.9]] 1)))
 (rf/reg-fx :audio/stop (fn [_] (audio/stop-all!)))
 (rf/reg-fx :later
@@ -81,7 +88,8 @@
   (fn [{:keys [db]} [_ {:keys [settings attempts history dict]}]]
     (let [s (merge default-settings settings)]
       (cond-> {:db (assoc db :settings s :attempts (vec attempts) :history (vec history)
-                          :dict (cond-> dict (= :intro (:phase dict)) (assoc :phase :write))
+                          :dict (when (= dict-version (:version dict))
+                                  (cond-> dict (= :intro (:phase dict)) (assoc :phase :write)))
                           :loaded? true)
                :html-lang (:lang s)}
         (:midi s) (assoc :midi/connect true)))))
@@ -105,19 +113,39 @@
 ;; ---------------------------------------------------------------- playback
 
 (defn- play
-  "Plays `notes` (MIDI) one after another, highlighting slot `first-slot` onwards when given."
-  [db notes dur & [first-slot then]]
-  (let [tok (inc (:token db))]
-    {:db (assoc db :token tok :playing (when first-slot first-slot))
-     :audio/play (keep-indexed (fn [i m] (when m [m (* i dur) (* 0.95 dur)])) notes)
+  "Plays `items` ({:m midi :t start :d length, seconds, :at highlight}), after a bar of clicks when
+   `count-in` is a number of beats, then dispatches `then`."
+  [db items & {:keys [count-in then]}]
+  (let [tok (inc (:token db))
+        off (if count-in (* count-in beat-s) 0)
+        end (+ off (reduce max 0 (map #(+ (:t %) (:d %)) items)))]
+    {:db (assoc db :token tok :playing nil)
+     :audio/play {:events (for [{:keys [m t d]} items :when m] [m (+ off t) (* 0.95 d)])
+                  :clicks (when count-in (for [k (range count-in)] [(* k beat-s) (zero? k)]))}
      :later (concat
-             (when first-slot
-               (for [i (range 1 (count notes))]
-                 {:ms (* 1000 i dur) :event [:play/at tok (+ first-slot i)]}))
-             [{:ms (* 1000 (count notes) dur) :event [:play/done tok then]}])}))
+             (for [{:keys [t at]} items :when at]
+               {:ms (* 1000 (+ off t)) :event [:play/at tok at]})
+             [{:ms (* 1000 end) :event [:play/done tok then]}])}))
+
+(defn- line-items
+  "Even notes, as for the scale."
+  [notes dur]
+  (map-indexed (fn [i n] {:m (t/midi n) :t (* i dur) :d dur}) notes))
+
+(def tick-s (/ beat-s rh/per-beat))
+
+(defn- bar-items
+  "Items for bars `from`..`to` of `bars` (`src` :melody or :answer), timed from the start of `from`."
+  [src bars from to beats]
+  (let [bar-len (rh/bar-ticks beats)]
+    (for [b (range from (inc to))
+          :let [bar (get bars b)]
+          [i on] (map-indexed vector (rh/onsets bar))
+          :let [e (bar i)]]
+      {:m (t/midi (:n e)) :t (* tick-s (+ on (* bar-len (- b from)))) :d (* tick-s (rh/ticks e)) :at [src b i]})))
 
 (rf/reg-event-db :play/at
-  (fn [db [_ tok slot]] (if (= tok (:token db)) (assoc db :playing slot) db)))
+  (fn [db [_ tok at]] (if (= tok (:token db)) (assoc db :playing at) db)))
 
 (rf/reg-event-fx :play/done
   (fn [{:keys [db]} [_ tok then]]
@@ -189,56 +217,42 @@
 
 ;; ---------------------------------------------------------------- dictation
 
-(defn n-slots [{:keys [beats bars]}] (* beats bars))
+(defn bar-len [d] (rh/bar-ticks (:beats d)))
 
-(defn bar-slots [{:keys [beats bar]}] [(* beats bar) (* beats (inc bar))])
+(defn cur-bar [d] (get-in d [:answer (:bar d)] []))
 
-(defn- in-bar? [d i] (let [[a b] (bar-slots d)] (and (<= a i) (< i b))))
+(defn first-sel
+  "The first index of the current bar that can be selected: 1 when the first note is given."
+  [{:keys [given? bar]}]
+  (if (and given? (zero? bar)) 1 0))
 
-(defn editable? [d i] (and (= :write (:phase d)) (in-bar? d i) (not (contains? (:given d) i))
-                           (not (contains? (:checked d) (:bar d)))))
+(defn writable? [{:keys [phase checked bar]}] (and (= :write phase) (not (contains? checked bar))))
+
+(defn editable? [d i] (and (writable? d) (<= (first-sel d) i) (< i (count (cur-bar d)))))
 
 (defn can-play? [d] (or (= :free (:repeats d)) (< (:plays d) strict-plays)))
 
-(defn grade [d i]
-  (let [want (get-in d [:melody i]) got (get-in d [:answer i])]
-    (cond (nil? got) :wrong
-          (= want got) :ok
-          (= (t/midi want) (t/midi got)) :enh
-          :else :wrong)))
-
-(defn results [d]
-  (let [gs (map #(grade d %) (remove (:given d) (range (n-slots d))))]
-    {:n (count gs) :ok (count (filter #{:ok} gs)) :enh (count (filter #{:enh} gs))}))
-
-(defn- step-notes
-  "The previous bar and the current one."
-  [{:keys [beats bar melody]}]
-  (let [from (* beats (max 0 (dec bar)))]
-    [from (subvec melody from (* beats (inc bar)))]))
-
-(defn- first-free [d]
-  (let [d (assoc d :phase :write)
-        [a b] (bar-slots d)]
-    (or (first (filter #(and (nil? (get-in d [:answer %])) (editable? d %)) (range a b)))
-        (first (filter #(editable? d %) (range a b)))
-        a)))
+(defn results
+  "Totals over the checked bars."
+  [d]
+  (apply merge-with + {:n 0 :ok 0 :enh 0 :pitch 0 :rhythm 0}
+         (map #(dissoc % :marks) (vals (:graded d)))))
 
 (rf/reg-event-fx :dict/new
   (fn [{:keys [db]} _]
     (let [s (:settings db)
           rng (t/step-range (:clef s) (:width s))
-          d0 {:key (:dict-key s) :beats (:dict-beats s) :bars (:dict-bars s) :clef (:clef s) :range rng
-              :chromatic (:dict-chromatic s) :repeats (:dict-repeats s)}
+          d0 {:version dict-version :key (:dict-key s) :beats (:dict-beats s) :bars (:dict-bars s)
+              :clef (:clef s) :range rng :chromatic (:dict-chromatic s) :repeats (:dict-repeats s)
+              :rhythm (:dict-rhythm s)}
           mel (melody/generate d0)
-          given (if (:dict-first s) #{0} #{})
+          given? (:dict-first s)
           d (assoc d0 :melody mel
-                   :answer (vec (repeat (count mel) nil))
-                   :given given :bar 0 :checked #{} :plays 0 :phase :intro :t (js/Date.now))
-          d (cond-> d (given 0) (assoc-in [:answer 0] (first mel)))
-          d (assoc d :sel (first-free d))
-          scale (melody/scale-notes (:key d) rng)]
-      (play (assoc db :dict d) (map t/midi scale) scale-s nil [:dict/intro-done]))))
+                   :answer (into [(if given? [(first (first mel))] [])] (repeat (dec (count mel)) []))
+                   :given? given? :bar 0 :checked #{} :graded {} :plays 0 :phase :intro :t (js/Date.now)
+                   :dur {:v :quarter :dot false :trip false})
+          d (assoc d :sel (count (get-in d [:answer 0])))]
+      (play (assoc db :dict d) (line-items (melody/scale-notes (:key d) rng) scale-s) :then [:dict/intro-done]))))
 
 (rf/reg-event-fx :dict/intro-done
   (fn [{:keys [db]} _]
@@ -247,114 +261,159 @@
        :audio/stop true
        :later [{:ms 700 :event [:dict/play 0]}]})))
 
+(defn- count-in [db] (when (get-in db [:settings :dict-count-in]) (get-in db [:dict :beats])))
+
 (rf/reg-event-fx :dict/play
   (fn [{:keys [db]} [_ bar]]
-    (let [d (:dict db)]
+    (let [{:keys [melody beats] :as d} (:dict db)]
       (when (and d (= :write (:phase d)) (can-play? d) (or (nil? bar) (= bar (:bar d))))
-        (let [[from notes] (step-notes d)]
-          (play (update-in db [:dict :plays] inc) (map t/midi notes) beat-s from))))))
+        (play (update-in db [:dict :plays] inc)
+              (bar-items :melody melody (max 0 (dec (:bar d))) (:bar d) beats)
+              :count-in (count-in db))))))
 
 (rf/reg-event-fx :dict/hear
   (fn [{:keys [db]} [_ which]]
-    (let [d (:dict db)]
+    (let [{:keys [melody answer beats bar bars] :as d} (:dict db)]
       (case which
-        :scale (play db (map t/midi (melody/scale-notes (:key d) (:range d))) scale-s)
-        :bar (let [[a b] (bar-slots d)] (play db (map t/midi (subvec (:melody d) a b)) beat-s a))
-        :melody (play db (map t/midi (:melody d)) beat-s 0)
-        :answer (play db (map #(some-> % t/midi) (:answer d)) beat-s 0)))))
+        :scale (play db (line-items (melody/scale-notes (:key d) (:range d)) scale-s))
+        :bar (play db (bar-items :melody melody bar bar beats) :count-in (count-in db))
+        :melody (play db (bar-items :melody melody 0 (dec bars) beats) :count-in (count-in db))
+        :answer (play db (bar-items :answer answer 0 (dec bars) beats) :count-in (count-in db))))))
 
-(defn- set-note [db i note]
-  (let [d (:dict db)]
-    (if (editable? d i)
-      (let [d (assoc-in d [:answer i] note)
-            [_ b] (bar-slots d)
-            nxt (first (filter #(editable? d %) (range (inc i) b)))]
-        (assoc db :dict (assoc d :sel (or nxt i))))
-      db)))
+(defn- remove-at [v i] (into (subvec v 0 i) (subvec v (inc i))))
 
-(rf/reg-event-db :dict/pick
-  (fn [db [_ i step]]
-    (let [{:keys [key beats answer] :as d} (:dict db)]
-      (if (editable? d i)
-        (set-note db i {:s step :a (t/implied-alt key beats answer i step)})
-        db))))
+(defn- fit
+  "The bar with `ev` at index `i` (replacing, or appended at the end), or nil if it overflows."
+  [d bar i ev]
+  (let [bar' (if (< i (count bar)) (assoc bar i ev) (conj bar ev))]
+    (when (<= (rh/total bar') (bar-len d)) bar')))
 
-(rf/reg-event-db :dict/select
-  (fn [db [_ i]] (if (editable? (:dict db) i) (assoc-in db [:dict :sel] i) db)))
+(defn- triplet-done?
+  "Whether the run of triplet notes ending at `i` completes a group."
+  [bar i]
+  (let [run (reverse (take-while :trip (reverse (subvec bar 0 (inc i)))))]
+    (and (seq run) (zero? (mod (reduce + (map rh/ticks run)) (* 2 (rh/values (:v (first run)))))))))
 
-(defn- ref-step
-  "The note before the selection, or the middle of the range."
-  [{:keys [answer sel] [lo hi] :range}]
-  (or (:s (last (keep #(get answer %) (range 0 (inc sel)))))
-      (quot (+ lo hi) 2)))
+(defn- set-bar [db bar sel]
+  (-> db
+      (assoc-in [:dict :answer (get-in db [:dict :bar])] bar)
+      (update :dict assoc :sel sel :flash nil)))
+
+(defn- place
+  "Enters `note` at the cursor with the input duration, then moves on."
+  [db note]
+  (let [{:keys [sel dur] :as d} (:dict db)
+        bar (cur-bar d)]
+    (when (and (writable? d) (<= (first-sel d) sel (count bar)))
+      (if-let [bar' (fit d bar sel (assoc dur :n note))]
+        (cond-> (set-bar db bar' (min (inc sel) (count bar')))
+          (and (:trip dur) (triplet-done? bar' sel)) (assoc-in [:dict :dur :trip] false))
+        (assoc-in db [:dict :flash] :no-room)))))
+
+(defn- prev-note [{:keys [answer bar sel]}]
+  (or (:n (get-in answer [bar (dec sel)]))
+      (:n (last (get answer (dec bar))))))
+
+(rf/reg-event-fx :dict/pick
+  (fn [{:keys [db]} [_ i step]]
+    (let [{:keys [key] :as d} (:dict db)
+          bar (cur-bar d)
+          note {:s step :a (t/implied-alt key (map :n bar) i step)}]
+      (cond
+        (editable? d i) {:db (set-bar db (assoc-in bar [i :n] note) (min (inc i) (count bar)))
+                         :audio/tap (t/midi note)}
+        (= i (count bar)) (when-let [db' (place (assoc-in db [:dict :sel] i) note)]
+                            {:db db' :audio/tap (t/midi note)})))))
 
 (rf/reg-event-fx :dict/letter
   (fn [{:keys [db]} [_ l]]
-    (let [{:keys [key beats answer sel] :as d} (:dict db)
-          ref (ref-step (assoc d :sel (if (get answer sel) sel (dec sel))))
-          [lo hi] (:range d)
-          s (->> (range (- ref 3) (+ ref 4))
-                 (filter #(= l (mod % 7)))
-                 first)
+    (let [{:keys [key sel] [lo hi] :range :as d} (:dict db)
+          ref (or (:s (prev-note d)) (quot (+ lo hi) 2))
+          s (first (filter #(= l (mod % 7)) (range (- ref 3) (+ ref 4))))
           s (cond (< s lo) (+ s 7) (> s hi) (- s 7) :else s)
-          note {:s s :a (t/implied-alt key beats answer sel s)}]
-      (when (editable? d sel)
-        {:db (set-note db sel note)
-         :audio/tap (t/midi note)}))))
+          note {:s s :a (t/implied-alt key (map :n (cur-bar d)) sel s)}]
+      (when-let [db' (place db note)]
+        {:db db' :audio/tap (t/midi note)}))))
 
 (rf/reg-event-fx :dict/midi
   (fn [{:keys [db]} [_ m]]
-    (let [{:keys [key sel] :as d} (:dict db)]
-      (when (and d (editable? d sel))
-        {:db (set-note db sel (t/spell key m))}))))
+    (when-let [d (:dict db)]
+      (when-let [db' (place db (t/spell (:key d) m))]
+        {:db db'}))))
+
+(defn- reshape
+  "Applies `f` to the duration of the selected note, if it still fits."
+  [db f]
+  (let [{:keys [sel] :as d} (:dict db)
+        bar (cur-bar d)]
+    (if (editable? d sel)
+      (if-let [bar' (fit d bar sel (f (bar sel)))]
+        (set-bar db bar' sel)
+        (assoc-in db [:dict :flash] :no-room))
+      db)))
+
+(rf/reg-event-db :dict/duration
+  (fn [db [_ v]]
+    (let [dot? (and (get-in db [:dict :dur :dot]) (rh/can-dot? v))]
+      (-> db
+          (update-in [:dict :dur] assoc :v v :dot dot?)
+          (reshape #(assoc % :v v :dot (and (:dot %) (rh/can-dot? v))))))))
+
+(rf/reg-event-db :dict/dot
+  (fn [db _]
+    (let [{:keys [v dot]} (get-in db [:dict :dur])]
+      (-> db
+          (cond-> (rh/can-dot? v) (update-in [:dict :dur] assoc :dot (not dot) :trip false))
+          (reshape #(if (rh/can-dot? (:v %)) (assoc % :dot (not (:dot %)) :trip false) %))))))
+
+(rf/reg-event-db :dict/triplet
+  (fn [db _]
+    (update-in db [:dict :dur] #(assoc % :trip (not (:trip %)) :dot false))))
 
 (defn edit-target
-  "The selected slot, or the note just entered when the selection is still empty."
-  [{:keys [answer sel] :as d} op]
-  (if (and (editable? d sel) (nil? (get answer sel)) (not (#{:delete :left :right} op))
-           (editable? d (dec sel)) (get answer (dec sel)))
-    (dec sel)
-    sel))
+  "The selected note, or the note just entered when the cursor is past it."
+  [{:keys [sel] :as d}]
+  (cond (editable? d sel) sel
+        (editable? d (dec sel)) (dec sel)))
 
 (rf/reg-event-fx :dict/edit
   (fn [{:keys [db]} [_ op]]
-    (let [{:keys [key beats answer] :as d} (:dict db)
-          sel (edit-target d op)
-          note (get answer sel)
-          moved (fn [ds] (let [s (+ (:s note) ds)] {:s s :a (t/implied-alt key beats answer sel s)}))
-          note' (when note
-                  (case op
-                    :up (moved 1)
-                    :down (moved -1)
-                    :sharp (update note :a #(min 2 (inc %)))
-                    :flat (update note :a #(max -2 (dec %)))
-                    :natural (assoc note :a 0)
-                    :respell (t/respell note)
-                    nil))]
-      (when (editable? d sel)
+    (let [{:keys [key sel] :as d} (:dict db)
+          bar (cur-bar d)
+          i (edit-target d)
+          note (when i (:n (bar i)))
+          moved (fn [ds] (let [s (+ (:s note) ds)] {:s s :a (t/implied-alt key (map :n bar) i s)}))]
+      (when (writable? d)
         (case op
-          :delete {:db (-> db
-                           (assoc-in [:dict :answer sel] nil)
-                           (update :dict (fn [d] (let [[a] (bar-slots d)
-                                                       prev (dec sel)]
-                                                   (if (and (nil? note) (>= prev a) (editable? d prev))
-                                                     (assoc-in (assoc d :sel prev) [:answer prev] nil)
-                                                     d)))))}
-          (:left :right) (let [i (+ sel (if (= op :left) -1 1))]
-                           (when (editable? d i) {:db (assoc-in db [:dict :sel] i)}))
-          (when note'
-            {:db (assoc-in db [:dict :answer sel] note')
-             :audio/tap (t/midi note')}))))))
+          :left (when (> sel (first-sel d)) {:db (assoc-in db [:dict :sel] (dec sel))})
+          :right (when (< sel (count bar)) {:db (assoc-in db [:dict :sel] (inc sel))})
+          :delete (cond
+                    (editable? d sel) {:db (set-bar db (remove-at bar sel) (min sel (dec (count bar))))}
+                    (editable? d (dec sel)) {:db (set-bar db (remove-at bar (dec sel)) (dec sel))})
+          (when note
+            (let [note' (case op
+                          :up (moved 1)
+                          :down (moved -1)
+                          :sharp (update note :a #(min 2 (inc %)))
+                          :flat (update note :a #(max -2 (dec %)))
+                          :natural (assoc note :a 0)
+                          :respell (t/respell note))]
+              {:db (set-bar db (assoc-in bar [i :n] note') sel)
+               :audio/tap (t/midi note')})))))))
 
 (rf/reg-event-fx :dict/check
   (fn [{:keys [db]} _]
-    (let [d (:dict db)]
-      (when (and d (= :write (:phase d)) (not (contains? (:checked d) (:bar d))))
-        (let [d (update d :checked conj (:bar d))
-              last? (= (:bar d) (dec (:bars d)))
-              d (cond-> d last? (assoc :phase :done :sel nil))
+    (let [{:keys [bar melody given?] :as d} (:dict db)]
+      (when (and d (writable? d))
+        (let [res (rh/grade-bar (melody bar) (cur-bar d) (if (and given? (zero? bar)) #{0} #{}))
+              d (-> d
+                    (update :checked conj bar)
+                    (assoc-in [:graded bar] res)
+                    (assoc :flash nil))
+              last? (= bar (dec (:bars d)))
+              d (cond-> d last? (assoc :phase :done))
               entry (when last?
-                      (merge (select-keys d [:key :beats :bars :clef :chromatic :repeats :t]) (results d)))]
+                      (merge (select-keys d [:key :beats :bars :clef :chromatic :repeats :rhythm :t]) (results d)))]
           {:db (cond-> (assoc db :dict d)
                  entry (update :history #(vec (take-last max-history (conj % entry)))))})))))
 
@@ -362,10 +421,8 @@
   (fn [{:keys [db]} _]
     (let [d (:dict db)]
       (when (and d (= :write (:phase d)) (contains? (:checked d) (:bar d)))
-        (let [d (assoc d :bar (inc (:bar d)) :plays 0)
-              d (assoc d :sel (first-free d))]
-          {:db (assoc db :dict d)
-           :dispatch [:dict/play]})))))
+        {:db (update db :dict assoc :bar (inc (:bar d)) :plays 0 :sel 0)
+         :dispatch [:dict/play]}))))
 
 (rf/reg-event-fx :dict/quit
   (fn [{:keys [db]} _]
@@ -382,6 +439,8 @@
 
 (rf/reg-event-fx :midi/note-on (fn [_ [_ m]] {:dispatch [:press m]}))
 (rf/reg-event-db :midi/note-off (fn [db _] db))
+
+(def duration-keys {"1" :16th "2" :eighth "3" :quarter "4" :half "5" :whole})
 
 (def letter-keys {"c" 0 "d" 1 "e" 2 "f" 3 "g" 4 "a" 5 "b" 6})
 
@@ -402,6 +461,10 @@
                        (= k "Enter") {:dispatch (if (contains? (:checked d) (:bar d)) [:dict/next] [:dict/check])}
                        (= k " ") {:dispatch [:dict/play]}
                        (letter-keys lk) {:dispatch [:dict/letter (letter-keys lk)]}
+                       (duration-keys k) (when (some #{(duration-keys k)} (rh/level-values (:rhythm d)))
+                                           {:dispatch [:dict/duration (duration-keys k)]})
+                       (= k ".") (when (>= (:rhythm d) 2) {:dispatch [:dict/dot]})
+                       (= lk "t") (when (>= (:rhythm d) 6) {:dispatch [:dict/triplet]})
                        :else (when-let [op ({"ArrowUp" :up "ArrowDown" :down "ArrowLeft" :left "ArrowRight" :right
                                              "#" :sharp "-" :flat "n" :natural "N" :natural "Backspace" :delete
                                              "Delete" :delete "x" :respell} k)]

@@ -35,7 +35,7 @@
 
 (deftest bar-accidentals
   (let [f# {:s 31 :a 1} f {:s 31 :a 0} g {:s 32 :a 0}]
-    (is (= [1 nil 0 nil] (t/accidentals c-major 4 [f# f# f g])))
-    (is (= [1 nil nil nil 1] (t/accidentals c-major 4 [f# g g g f#])) "a new bar resets")
-    (is (= 1 (t/implied-alt c-major 4 [f# g] 2 31)))
-    (is (= 0 (t/implied-alt c-major 4 [f# g g g] 4 31)))))
+    (is (= [1 nil 0 nil] (t/accidentals c-major [f# f# f g])))
+    (is (= [nil nil nil] (t/accidentals e-flat [{:s 30 :a -1} g {:s 30 :a -1}])) "no accidental where the signature has it")
+    (is (= 1 (t/implied-alt c-major [f# g] 2 31)))
+    (is (= 0 (t/implied-alt c-major [] 0 31)))))

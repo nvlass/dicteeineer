@@ -18,17 +18,30 @@
                     (str/join " · " [(plural note-octaves "octave" "octaves")
                                      (if note-accidentals "all 12 notes" "white keys")
                                      (if (= note-reference :none) "no reference" "reference")]))
-    :dict-summary (fn [loc {:keys [key beats bars chromatic repeats]}]
+    :dict-summary (fn [loc {:keys [key beats bars chromatic repeats rhythm]}]
                     (str/join " · " (cond-> [(key-name loc key) (str beats "/4") (plural bars "bar" "bars")]
+                                      (> (or rhythm 1) 1) (conj (str "rhythm " rhythm))
                                       chromatic (conj "chromatic")
                                       true (conj (if (= repeats :free) "free" "strict")))))
     :wrong-note (fn [_ target answer] [:<> "It was " [:b target] ", you played " [:b answer]])
     :result (fn [_ ok enh n] (str ok (when (pos? enh) (str " + " enh " spelled differently")) " of " n " notes right"))
+    :pitch-rhythm (fn [_ p r] (str "Pitch " p " · rhythm " r))
     :bar-of (fn [_ b n] (str "Bar " b " of " n))
     :hearing (fn [_ b] (str " · plays bars " (dec b) "–" b))
     :plays-left (fn [_ n] (plural n "play left" "plays left"))
     :bar-wrong (fn [_ n] (plural n "mistake" "mistakes"))
     :attempts (fn [_ n] (plural n "attempt" "attempts"))}
+
+   :rhythm
+   {:l1 "Quarter notes only."
+    :l2 "Adds half, dotted half and whole notes."
+    :l3 "Adds pairs of eighths."
+    :l4 "Adds the dotted quarter + eighth."
+    :l5 "Adds sixteenths: four, eighth + two, two + eighth, dotted eighth + sixteenth."
+    :l6 "Adds eighth-note triplets."}
+
+   :dur {:16th "Sixteenth (1)" :eighth "Eighth (2)" :quarter "Quarter (3)" :half "Half (4)" :whole "Whole (5)"
+         :dot "Dot (.)" :triplet "Triplet (T): the next three notes"}
 
    :nav {:note "Note" :dictation "Dictation" :stats "Stats" :settings "Settings"}
 
@@ -71,6 +84,9 @@
     :bars "Bars"
     :repeats "Repeats"
     :strict "Strict (2 plays)" :free "Free"
+    :rhythm "Rhythm"
+    :count-in "Count-in: a bar of clicks before each play"
+    :no-room "Doesn't fit in the bar"
     :chromatic "Chromatic notes"
     :chromatic-hint "Notes outside the key, as half-step approaches: raised going up, lowered going down."
     :first-given "Give the first note"
@@ -95,8 +111,9 @@
     :tool-natural "Natural (n)"
     :tool-respell "Enharmonic spelling (x)"
     :tool-delete "Delete (⌫)"
-    :dict-keys [:<> "Write each bar after hearing it with the bar before. Click the staff, play the keyboard, or type "
-                [:kbd "A"] "–" [:kbd "G"] "; " [:kbd "↑"] [:kbd "↓"] " move a note, " [:kbd "#"] " " [:kbd "-"] " " [:kbd "n"]
+    :dict-keys [:<> "Write each bar after hearing it with the bar before. Pick a duration ("
+                [:kbd "1"] "–" [:kbd "5"] ", " [:kbd "."] " dot, " [:kbd "T"] " triplet), then click the staff, play the keyboard, or type "
+                [:kbd "A"] "–" [:kbd "G"] ". With a note selected (" [:kbd "←"] [:kbd "→"] "), a duration changes it; " [:kbd "↑"] [:kbd "↓"] " move a note, " [:kbd "#"] " " [:kbd "-"] " " [:kbd "n"]
                 " accidentals, " [:kbd "x"] " respell, " [:kbd "⌫"] " delete, " [:kbd "Space"] " play, "
                 [:kbd "Enter"] " check / next."]
     :no-attempts "No answers yet."

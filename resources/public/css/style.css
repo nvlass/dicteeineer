@@ -17,6 +17,7 @@
   --bad-soft: #f9e3e3;
   --warn: #b26b00;
   --warn-soft: #fbf0d9;
+  --rhythm: #2f74c0;
   --key-white: #ffffff;
   --key-black: #2a2a30;
   --radius: 12px;
@@ -43,6 +44,7 @@
     --bad-soft: #3d2222;
     --warn: #e9a53c;
     --warn-soft: #3a3020;
+    --rhythm: #6aa8f0;
     --key-white: #e9e9ee;
     --key-black: #101014;
     color-scheme: dark;
@@ -307,3 +309,39 @@ kbd {
 
 .actions.center .primary { margin-left: 0; }
 @media (max-width: 420px) { nav button { font-size: .86rem; padding: 9px 0; } nav { gap: 2px; } }
+
+/* ---------------------------------------------------------------- rhythm input */
+
+.input-bar { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: flex-start; margin-bottom: 6px; }
+.durations { display: flex; flex-wrap: wrap; gap: 4px; }
+button.dur { flex-direction: column; gap: 0; min-width: 36px; min-height: 0; padding: 2px 1px 3px; line-height: 1; }
+button.dur.on { border-color: var(--accent); background: var(--accent-soft); }
+button.dur small { font-size: .68rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+button.dur .glyph { display: flex; align-items: center; justify-content: center; height: 40px; font-weight: 700; font-size: 1.1rem; }
+svg.dur-icon { display: block; }
+svg.dur-icon .head { fill: var(--ink); }
+svg.dur-icon .stem, svg.dur-icon .flag { stroke: var(--ink); stroke-width: 1.4; fill: none; }
+.tools { margin-bottom: 0; }
+.tools button { min-height: 40px; }
+.level-hint { display: block; color: var(--ink-3); margin-top: 4px; }
+.banner .sub { font-weight: 400; font-size: .9rem; margin-top: 2px; }
+
+.score .beam { fill: var(--ink); }
+.score .flag { stroke: var(--ink); stroke-width: 1.6; fill: none; }
+.score .dot { fill: var(--ink); }
+.score .tuplet { font: italic 700 12px Georgia, serif; fill: var(--ink-2); }
+.score .note.rhythm .head, .score .note.rhythm .acc, .score .note.rhythm .dot { fill: var(--rhythm); }
+.score .note.rhythm .stem, .score .note.rhythm .flag { stroke: var(--rhythm); }
+.score .note.pitch .head, .score .note.pitch .acc, .score .note.pitch .dot { fill: var(--bad); }
+.score .note.pitch .stem, .score .note.pitch .flag { stroke: var(--bad); }
+.score .note.playing .head { fill: var(--accent); }
+.score .correct { opacity: .5; }
+.score .correct .head, .score .correct .acc, .score .correct .dot, .score .correct .beam { fill: var(--good); }
+.score .correct .stem, .score .correct .flag { stroke: var(--good); }
+.score .note.sel .dot { fill: var(--accent); }
+.score .note.sel .flag { stroke: var(--accent); }
+.score .note.ok .flag { stroke: var(--good); } .score .note.ok .dot { fill: var(--good); }
+.score .note.enh .flag { stroke: var(--warn); } .score .note.enh .dot { fill: var(--warn); }
+.score .note.wrong .flag { stroke: var(--bad); } .score .note.wrong .dot { fill: var(--bad); }
+.score .note.given .flag { stroke: var(--ink-3); } .score .note.given .dot { fill: var(--ink-3); }
+.score .beam-group.given .beam { fill: var(--ink-3); }
