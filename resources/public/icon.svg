@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="104" fill="#17171c"/>
+  <g stroke="#8a8a93" stroke-width="8">
+    <line x1="56" y1="150" x2="456" y2="150"/><line x1="56" y1="190" x2="456" y2="190"/><line x1="56" y1="230" x2="456" y2="230"/>
+    <line x1="56" y1="270" x2="456" y2="270"/><line x1="56" y1="310" x2="456" y2="310"/>
+  </g>
+  <g fill="#8b7cf6" stroke="#8b7cf6" stroke-width="10">
+    <ellipse cx="140" cy="290" rx="30" ry="21" transform="rotate(-22 140 290)"/><line x1="166" y1="284" x2="166" y2="140"/>
+    <ellipse cx="230" cy="250" rx="30" ry="21" transform="rotate(-22 230 250)"/><line x1="256" y1="244" x2="256" y2="100"/>
+    <ellipse cx="320" cy="210" rx="30" ry="21" transform="rotate(-22 320 210)"/><line x1="346" y1="204" x2="346" y2="60"/>
+  </g>
+  <line x1="410" y1="150" x2="410" y2="310" stroke="#ececf1" stroke-width="8"/>
+  <g fill="#ececf1">
+    <rect x="96" y="372" width="56" height="88" rx="8"/><rect x="164" y="372" width="56" height="88" rx="8"/><rect x="232" y="372" width="56" height="88" rx="8"/>
+    <rect x="300" y="372" width="56" height="88" rx="8"/><rect x="368" y="372" width="56" height="88" rx="8"/>
+  </g>
+  <g fill="#17171c"><rect x="138" y="372" width="28" height="52" rx="4"/><rect x="206" y="372" width="28" height="52" rx="4"/><rect x="342" y="372" width="28" height="52" rx="4"/></g>
+</svg>
