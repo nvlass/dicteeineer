@@ -1,4 +1,4 @@
-const VERSION = 'dt-v1';
+const VERSION = 'dt-v2';
 const SAMPLES = Array.from({length: 21}, (_, i) => `samples/${36 + 3 * i}.mp3`);
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/main.js', 'manifest.json', 'icon.svg', 'icon-192.png'];
 

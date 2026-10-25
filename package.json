@@ -1,5 +1,5 @@
 {
-  "name": "dicteeiner",
+  "name": "dicteeineer",
   "private": true,
   "scripts": {
     "watch": "shadow-cljs watch app",

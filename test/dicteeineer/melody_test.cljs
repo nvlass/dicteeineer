@@ -1,7 +1,7 @@
-(ns dicteeiner.melody-test
+(ns dicteeineer.melody-test
   (:require [cljs.test :refer [deftest is testing]]
-            [dicteeiner.theory :as t]
-            [dicteeiner.melody :as m]))
+            [dicteeineer.theory :as t]
+            [dicteeineer.melody :as m]))
 
 (defn- keys-all [] (concat (t/keys-of :major) (t/keys-of :minor)))
 

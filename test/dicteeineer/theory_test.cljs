@@ -1,6 +1,6 @@
-(ns dicteeiner.theory-test
+(ns dicteeineer.theory-test
   (:require [cljs.test :refer [deftest is testing]]
-            [dicteeiner.theory :as t]))
+            [dicteeineer.theory :as t]))
 
 (def c-major t/default-key)
 (def a-minor {:tonic {:l 5 :a 0} :mode :minor})

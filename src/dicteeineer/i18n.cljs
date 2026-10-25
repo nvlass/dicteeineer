@@ -1,10 +1,10 @@
-(ns dicteeiner.i18n
+(ns dicteeineer.i18n
   (:require [clojure.string :as str]
             [re-frame.core :as rf]
             [tongue.core :as tongue]
-            [dicteeiner.theory :as t]
-            [dicteeiner.i18n.en :as en]
-            [dicteeiner.i18n.el :as el]))
+            [dicteeineer.theory :as t]
+            [dicteeineer.i18n.en :as en]
+            [dicteeineer.i18n.el :as el]))
 
 ;; Every entry is a string, a hiccup vector, or a fn of (loc & args). `loc` is {:lang :names},
 ;; :names being the seven note names in use, so the dictionaries can name notes without re-frame.

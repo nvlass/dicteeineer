@@ -1,5 +1,5 @@
-(ns dicteeiner.melody
-  (:require [dicteeiner.theory :as t]))
+(ns dicteeineer.melody
+  (:require [dicteeineer.theory :as t]))
 
 ;; Melodies are walks over scale degrees: mostly steps, some leaps, each large leap recovered by a
 ;; step back; start on a tonic triad note and end 2→1 or 7→1. Candidates failing `melodic-ok?`

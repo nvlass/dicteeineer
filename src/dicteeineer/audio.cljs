@@ -1,4 +1,4 @@
-(ns dicteeiner.audio)
+(ns dicteeineer.audio)
 
 (def sample-notes (vec (range 36 97 3)))
 

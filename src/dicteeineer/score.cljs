@@ -1,6 +1,6 @@
-(ns dicteeiner.score
+(ns dicteeineer.score
   (:require [reagent.core :as r]
-            [dicteeiner.theory :as t]))
+            [dicteeineer.theory :as t]))
 
 ;; One SVG per system (line of bars). 5px per diatonic step, so staff lines are 10px apart.
 ;; On the grand staff notes from middle C up go on the treble staff.

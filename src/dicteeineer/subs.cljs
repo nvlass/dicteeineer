@@ -1,7 +1,7 @@
-(ns dicteeiner.subs
+(ns dicteeineer.subs
   (:require [re-frame.core :as rf]
-            [dicteeiner.stats :as stats]
-            [dicteeiner.i18n :as i18n]))
+            [dicteeineer.stats :as stats]
+            [dicteeineer.i18n :as i18n]))
 
 (doseq [k [:view :settings :note :dict :attempts :history :samples :midi :playing :width]]
   (rf/reg-sub k (fn [db _] (k db))))

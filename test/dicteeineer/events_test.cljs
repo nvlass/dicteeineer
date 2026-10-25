@@ -1,7 +1,7 @@
-(ns dicteeiner.events-test
+(ns dicteeineer.events-test
   (:require [cljs.test :refer [deftest is]]
-            [dicteeiner.theory :as t]
-            [dicteeiner.events :as e]))
+            [dicteeineer.theory :as t]
+            [dicteeineer.events :as e]))
 
 (def c4 {:s 28 :a 0})
 (def d4 {:s 29 :a 0})

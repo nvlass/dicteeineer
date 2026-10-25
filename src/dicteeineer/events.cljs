@@ -1,11 +1,11 @@
-(ns dicteeiner.events
+(ns dicteeineer.events
   (:require [re-frame.core :as rf]
-            [dicteeiner.theory :as t]
-            [dicteeiner.melody :as melody]
-            [dicteeiner.audio :as audio]
-            [dicteeiner.storage :as storage]
-            [dicteeiner.midi :as midi]
-            [dicteeiner.i18n :as i18n]))
+            [dicteeineer.theory :as t]
+            [dicteeineer.melody :as melody]
+            [dicteeineer.audio :as audio]
+            [dicteeineer.storage :as storage]
+            [dicteeineer.midi :as midi]
+            [dicteeineer.i18n :as i18n]))
 
 (def default-settings
   {:lang (i18n/browser-lang)

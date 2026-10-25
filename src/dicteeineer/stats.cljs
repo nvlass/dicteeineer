@@ -1,4 +1,4 @@
-(ns dicteeiner.stats)
+(ns dicteeineer.stats)
 
 (def recent-window 20)
 

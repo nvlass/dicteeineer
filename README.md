@@ -1,6 +1,6 @@
-# Dicteeiner
+# Dicteeineer
 
-Ear training for pitch and melodic dictation. Sibling of `../chordtrainer` and `../counterpointer`: static re-frame SPA, works offline (PWA), English and Greek, everything stays in the browser (IndexedDB).
+Ear training for pitch and melodic dictation (dictée + engineer). Sibling of `../chordtrainer` and `../counterpointer`: static re-frame SPA, works offline (PWA), English and Greek, everything stays in the browser (IndexedDB).
 
 ## Modes
 
@@ -31,7 +31,7 @@ npx shadow-cljs compile test  # theory, melody and grading tests (node)
 
 ```sh
 npm run dist
-rsync -a --delete dist/ server:/var/www/dicteeiner/
+rsync -a --delete dist/ server:/var/www/dicteeineer/
 ```
 
 Plain static files; the nginx config from chordtrainer's README applies as is (no-cache for `sw.js`, `index.html`, `/js/`; immutable for `/samples/`).

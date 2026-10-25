@@ -1,11 +1,11 @@
-(ns dicteeiner.views
+(ns dicteeineer.views
   (:require [re-frame.core :as rf]
             [reagent.core :as r]
-            [dicteeiner.theory :as t]
-            [dicteeiner.events :as events]
-            [dicteeiner.score :as score]
-            [dicteeiner.piano :refer [piano]]
-            [dicteeiner.i18n :refer [tr]]))
+            [dicteeineer.theory :as t]
+            [dicteeineer.events :as events]
+            [dicteeineer.score :as score]
+            [dicteeineer.piano :refer [piano]]
+            [dicteeineer.i18n :refer [tr]]))
 
 (defn <sub [q] @(rf/subscribe q))
 (defn >evt [e] (rf/dispatch e))
@@ -331,7 +331,7 @@
         s (<sub [:settings])]
     [:div.app
      [:header
-      [:h1 "Dicteeiner"]
+      [:h1 "Dicteeineer"]
       [:div.header-end
        (when-not (<sub [:samples]) [:span.badge (tr :ui/loading-sounds)])
        [:div.lang

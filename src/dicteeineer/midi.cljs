@@ -1,4 +1,4 @@
-(ns dicteeiner.midi
+(ns dicteeineer.midi
   (:require [re-frame.core :as rf]))
 
 (defonce access (atom nil))

@@ -1,6 +1,6 @@
-(ns dicteeiner.piano
+(ns dicteeineer.piano
   (:require [reagent.core :as r]
-            [dicteeiner.theory :as t]))
+            [dicteeineer.theory :as t]))
 
 (defn- white-lo [m] (if (t/white? m) m (dec m)))
 (defn- white-hi [m] (if (t/white? m) m (inc m)))

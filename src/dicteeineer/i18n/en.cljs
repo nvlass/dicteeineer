@@ -1,6 +1,6 @@
-(ns dicteeiner.i18n.en
+(ns dicteeineer.i18n.en
   (:require [clojure.string :as str]
-            [dicteeiner.theory :as t]))
+            [dicteeineer.theory :as t]))
 
 (defn- note [loc n] (t/note-name n (:names loc)))
 (defn- tonic [loc tn] (t/tonic-name tn (:names loc)))

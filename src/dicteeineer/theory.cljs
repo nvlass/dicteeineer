@@ -1,4 +1,4 @@
-(ns dicteeiner.theory)
+(ns dicteeineer.theory)
 
 ;; A note is {:s diatonic step, :a alteration}: :s is letter index + 7 × octave, so C4 = 28.
 ;; A key is {:tonic {:l letter :a alteration} :mode :major|:minor}; minor melodies use the

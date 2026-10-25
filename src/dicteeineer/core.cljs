@@ -1,13 +1,13 @@
-(ns dicteeiner.core
+(ns dicteeineer.core
   (:require [reagent.dom.client :as rdc]
             [re-frame.core :as rf]
             [re-frame.db :refer [app-db]]
             [clojure.string :as str]
-            [dicteeiner.events]
-            [dicteeiner.subs]
-            [dicteeiner.views :as views]
-            [dicteeiner.audio :as audio]
-            [dicteeiner.storage :as storage]))
+            [dicteeineer.events]
+            [dicteeineer.subs]
+            [dicteeineer.views :as views]
+            [dicteeineer.audio :as audio]
+            [dicteeineer.storage :as storage]))
 
 (defonce root (atom nil))
 

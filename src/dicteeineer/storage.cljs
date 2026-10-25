@@ -1,4 +1,4 @@
-(ns dicteeiner.storage
+(ns dicteeineer.storage
   (:require ["idb-keyval" :as idb]
             [cljs.reader :as reader]))
 

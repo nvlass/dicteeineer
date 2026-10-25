@@ -1,4 +1,4 @@
-# Dicteeiner
+# Dicteeineer
 
 Static re-frame/shadow-cljs SPA for pitch and melodic dictation, no backend. Sibling of `../chordtrainer` and `../counterpointer` (same stack; `audio`, `midi`, `storage`, `i18n` and the samples were copied from counterpointer). See README for modes and deploy.
 
