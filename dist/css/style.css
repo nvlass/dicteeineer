@@ -345,3 +345,6 @@ svg.dur-icon .stem, svg.dur-icon .flag { stroke: var(--ink); stroke-width: 1.4; 
 .score .note.wrong .flag { stroke: var(--bad); } .score .note.wrong .dot { fill: var(--bad); }
 .score .note.given .flag { stroke: var(--ink-3); } .score .note.given .dot { fill: var(--ink-3); }
 .score .beam-group.given .beam { fill: var(--ink-3); }
+
+.crash pre.crash-msg { white-space: pre-wrap; font-size: .8rem; color: var(--ink-3); background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+.crash .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }

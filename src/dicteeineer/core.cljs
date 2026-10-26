@@ -6,6 +6,7 @@
             [dicteeineer.events]
             [dicteeineer.subs]
             [dicteeineer.views :as views]
+            [dicteeineer.guard :as guard]
             [dicteeineer.audio :as audio]
             [dicteeineer.storage :as storage]))
 
@@ -15,7 +16,7 @@
   (rf/clear-subscription-cache!)
   (when-not @root
     (reset! root (rdc/create-root (js/document.getElementById "app"))))
-  (rdc/render @root [views/app]))
+  (rdc/render @root [guard/guard [views/app]]))
 
 (def captured #{"ArrowUp" "ArrowDown" "ArrowLeft" "ArrowRight" " " "Backspace"})
 
