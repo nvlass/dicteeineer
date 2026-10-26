@@ -48,3 +48,7 @@ rsync -a --delete dist/ server:/var/www/dicteeineer/
 Plain static files; the nginx config from chordtrainer's README applies as is (no-cache for `sw.js`, `index.html`, `/js/`; immutable for `/samples/`).
 
 Piano samples: FluidR3_GM acoustic grand (via [gleitz/midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts), CC BY 3.0).
+
+## License
+
+MIT, see [LICENSE](LICENSE). The piano samples are CC BY 3.0 (see above).
